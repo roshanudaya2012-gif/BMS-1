@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JK BMS Monitor</title>
+<style>
+:root{--bg:#eef2f4;--surface:#fff;--ink:#14212b;--mute:#5d6f7c;--line:#d5dde2;--chg:#0f9d78;--dis:#e0702b;--soc:#2563c9;--warn:#c8352f;color-scheme:light;
+--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--num:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d151b;--surface:#16212a;--ink:#e6edf1;--mute:#8da0ad;--line:#26343f;--chg:#38c9a0;--dis:#f59a5c;--soc:#6ea2f5;--warn:#ff7b72;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d151b;--surface:#16212a;--ink:#e6edf1;--mute:#8da0ad;--line:#26343f;--chg:#38c9a0;--dis:#f59a5c;--soc:#6ea2f5;--warn:#ff7b72;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--sans);min-height:100vh}
+.wrap{max-width:1040px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+h1{font-size:18px;margin:0;font-weight:650}
+.st{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--chg)}
+.demo{border:1px solid var(--line);border-radius:4px;padding:1px 7px;font-size:12px;color:var(--mute)}
+nav{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px}
+nav button{background:none;border:0;border-bottom:2px solid transparent;color:var(--mute);font:inherit;padding:9px 14px;cursor:pointer}
+nav button[aria-selected="true"]{color:var(--ink);border-color:var(--soc);font-weight:600}
+.cbtn{background:var(--soc);color:#fff;border:0;border-radius:6px;padding:8px 14px;font:600 14px var(--sans);cursor:pointer}
+.cbtn:disabled{opacity:.6}
+button:focus-visible{outline:2px solid var(--soc);outline-offset:2px}
+.pane{display:none}.pane.on{display:block}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:14px}
+.card h2{font-size:14px;margin:0 0 12px;font-weight:600;color:var(--mute)}
+.hero{display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:center}
+.gauge{position:relative;width:180px;height:180px;justify-self:center}
+.gauge svg{width:100%;height:100%;transform:rotate(-90deg)}
+.gauge circle{fill:none;stroke-width:14}
+.gauge .tr{stroke:var(--line)}.gauge .fl{stroke:var(--soc);stroke-linecap:round;transition:stroke-dashoffset .6s}
+.gc{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.gc b{font:600 44px/1 var(--num)}.gc span{color:var(--mute);font-size:13px}
+.pw{font:600 54px/1 var(--num);letter-spacing:-1px}
+.pw small{font-size:20px;color:var(--mute);margin-left:4px}
+.dir{font-size:14px;font-weight:600;margin-bottom:6px}
+.chg{color:var(--chg)}.dis{color:var(--dis)}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-top:16px}
+.kv div{border-left:3px solid var(--line);padding-left:10px}
+.kv b{display:block;font:600 18px var(--num)}.kv span{color:var(--mute);font-size:12.5px}
+canvas{width:100%;height:220px;display:block}
+.leg{display:flex;gap:14px;font-size:13px;color:var(--mute);margin-top:8px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
+.cells{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.cell{border:1px solid var(--line);border-radius:6px;padding:8px 10px;position:relative;overflow:hidden}
+.cell .n{font-size:12px;color:var(--mute)}.cell .v{font:600 16px var(--num)}
+.cell .b{position:absolute;left:0;bottom:0;height:3px;background:var(--soc);width:50%}
+.cell.hi{border-color:var(--chg)}.cell.lo{border-color:var(--dis)}
+.cell.bal .n::after{content:" balancing";color:var(--soc)}
+.rows div{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)}
+.rows div:last-child{border:0}.rows b{font-family:var(--num);font-weight:600}.rows span{color:var(--mute)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g2 .card{margin:0}
+@media(max-width:700px){.hero{grid-template-columns:1fr}.g2{grid-template-columns:1fr}.g2 .card{margin-bottom:14px}.pw{font-size:44px}}
+@media(prefers-reduced-motion:reduce){.gauge .fl{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>JK BMS Monitor <span class="demo" id="mode">not connected</span></h1>
+  <div class="st"><button class="cbtn" id="cb">Connect to BMS</button><span class="dot" id="dot"></span><span id="upd">Not connected</span></div>
+</header>
+<nav role="tablist">
+  <button role="tab" aria-selected="true" data-t="ov">Overview</button>
+  <button role="tab" aria-selected="false" data-t="ce">Cells</button>
+  <button role="tab" aria-selected="false" data-t="sy">System</button>
+</nav>
+
+<section class="pane on" id="ov">
+  <div class="card hero">
+    <div class="gauge">
+      <svg viewBox="0 0 180 180"><circle class="tr" cx="90" cy="90" r="80"/><circle class="fl" id="gf" cx="90" cy="90" r="80"/></svg>
+      <div class="gc"><b id="soc">--</b><span>State of charge</span></div>
+    </div>
+    <div>
+      <div class="dir" id="dir">--</div>
+      <div class="pw"><span id="pw">--</span><small>W</small></div>
+      <div class="kv">
+        <div><b id="v">--</b><span>Pack voltage (V)</span></div>
+        <div><b id="a">--</b><span>Current (A)</span></div>
+        <div><b id="rem">--</b><span>Remaining (Ah)</span></div>
+        <div><b id="dl">--</b><span>Cell difference (mV)</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Last 24 hours</h2>
+    <canvas id="ch" aria-label="State of charge and power over 24 hours"></canvas>
+    <div class="leg"><span><i style="background:var(--soc)"></i>State of charge</span><span><i style="background:var(--chg)"></i>Charging</span><span><i style="background:var(--dis)"></i>Discharging</span></div>
+  </div>
+</section>
+
+<section class="pane" id="ce">
+  <div class="card"><h2>Cell voltages <span id="cc"></span></h2><div class="cells" id="cells"></div></div>
+  <div class="g2">
+    <div class="card"><h2>Temperatures</h2><div class="rows">
+      <div><span>MOSFET</span><b id="tm">--</b></div><div><span>Sensor 1</span><b id="t1">--</b></div><div><span>Sensor 2</span><b id="t2">--</b></div></div></div>
+    <div class="card"><h2>Balancer</h2><div class="rows">
+      <div><span>Status</span><b id="bs">--</b></div><div><span>Highest cell</span><b id="hc">--</b></div><div><span>Lowest cell</span><b id="lc">--</b></div></div></div>
+  </div>
+</section>
+
+<section class="pane" id="sy">
+  <div class="g2">
+    <div class="card"><h2>Capacity and cycles</h2><div class="rows">
+      <div><span>Nominal capacity</span><b id="nom">--</b></div><div><span>Cycle count</span><b id="cy">--</b></div>
+      <div><span>State of health</span><b id="soh">--</b></div><div><span>Charge / discharge MOSFET</span><b id="mos">--</b></div></div></div>
+    <div class="card"><h2>BMS settings</h2><div class="rows">
+      <div><span>Cells in series</span><b id="scells">--</b></div><div><span>Cell over / under voltage</span><b id="sv">--</b></div>
+      <div><span>Balancer starts at</span><b id="sbal">--</b></div><div><span>Max charge / discharge</span><b id="sma">--</b></div></div></div>
+  </div>
+</section>
+</div>
+
+<script>
+const N=24,CAP=67;
+const $=id=>document.getElementById(id);
+let soc=0,hist=[];
+function render(s){
+  const p=s.a*s.total;
+  $('soc').textContent=Math.round(soc)+'%';
+  $('gf').style.strokeDasharray=2*Math.PI*80;$('gf').style.strokeDashoffset=2*Math.PI*80*(1-soc/100);
+  $('pw').textContent=Math.abs(p).toFixed(0);
+  const d=$('dir');d.textContent=s.a>.5?'Charging':s.a<-.5?'Discharging':'Idle';d.className='dir '+(s.a>.5?'chg':s.a<-.5?'dis':'');
+  $('v').textContent=s.total.toFixed(2);$('a').textContent=s.a.toFixed(1);
+  $('rem').textContent=s.rem.toFixed(1);$('dl').textContent=Math.round((s.mx-s.mn)*1000);
+  const T=s.T;
+  $('tm').textContent=T[0].toFixed(1)+' °C';$('t1').textContent=T[1].toFixed(1)+' °C';$('t2').textContent=T[2].toFixed(1)+' °C';
+  $('bs').textContent=s.bal?'Balancing':'Off';
+  const hi=s.cells.indexOf(s.mx),lo=s.cells.indexOf(s.mn);
+  $('hc').textContent='Cell '+(hi+1)+' · '+s.mx.toFixed(3)+' V';$('lc').textContent='Cell '+(lo+1)+' · '+s.mn.toFixed(3)+' V';
+  $('cy').textContent=s.cy;$('nom').textContent=s.nom.toFixed(1)+' Ah';$('soh').textContent=s.soh+' %';$('mos').textContent=(s.mc?'on':'off')+' / '+(s.md?'on':'off');$('cc').textContent='('+N+')';
+  const box=$('cells');
+  if(!box.children.length)box.innerHTML=s.cells.map((_,i)=>`<div class="cell"><div class="n">Cell ${i+1}</div><div class="v"></div><div class="b"></div></div>`).join('');
+  [...box.children].forEach((el,i)=>{const v=s.cells[i];el.querySelector('.v').textContent=v.toFixed(3)+' V';
+    el.querySelector('.b').style.width=Math.min(100,Math.max(0,(v-2.6)/(3.65-2.6)*100))+'%';
+    el.classList.toggle('hi',i===hi);el.classList.toggle('lo',i===lo);el.classList.toggle('bal',s.bal&&v-s.mn>.006)});
+  $('upd').textContent='Updated '+s.now.toLocaleTimeString();
+  draw();
+}
+function draw(){
+  const c=$('ch'),r=c.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+  c.width=r.width*dpr;c.height=r.height*dpr;const x=c.getContext('2d');x.scale(dpr,dpr);
+  const W=r.width,H=r.height,L=36,R=40,T=8,B=22,cs=getComputedStyle(document.documentElement);
+  const col=n=>cs.getPropertyValue(n).trim();
+  x.clearRect(0,0,W,H);x.font='11px system-ui';x.fillStyle=col('--mute');x.strokeStyle=col('--line');
+  const t1=Date.now(),t0=t1-864e5,X=t=>L+(t-t0)/(t1-t0)*(W-L-R);
+  const pm=Math.max(500,...hist.map(p=>Math.abs(p.p))),Yp=p=>T+(H-T-B)*(.5-p/pm/2),Ys=s=>T+(H-T-B)*(1-s/100);
+  for(let s=0;s<=100;s+=25){x.beginPath();x.moveTo(L,Ys(s));x.lineTo(W-R,Ys(s));x.stroke();x.textAlign='right';x.fillText(s+'%',L-5,Ys(s)+4)}
+  x.textAlign='left';x.fillText(Math.round(pm)+' W',W-R+4,T+8);x.fillText('-'+Math.round(pm),W-R+4,H-B);
+  for(let k=0;k<=24;k+=6){const t=t0+k*36e5;x.textAlign='center';x.fillText(new Date(t).getHours()+':00',X(t),H-6)}
+  const z=Yp(0);
+  for(let i=1;i<hist.length;i++){const a=hist[i-1],b=hist[i];x.fillStyle=(b.p>=0?col('--chg'):col('--dis'))+'66';
+    x.fillRect(X(a.t),Math.min(Yp(b.p),z),Math.max(1,X(b.t)-X(a.t)),Math.abs(Yp(b.p)-z))}
+  x.beginPath();hist.forEach((p,i)=>i?x.lineTo(X(p.t),Ys(p.soc)):x.moveTo(X(p.t),Ys(p.soc)));
+  x.strokeStyle=col('--soc');x.lineWidth=2;x.stroke();
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(o=>o.setAttribute('aria-selected',o===b));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id===b.dataset.t));draw()});
+addEventListener('resize',draw);
+addEventListener('load',()=>{setStatus('Not connected',false);draw()});
+
+/* ---------- real BMS over Web Bluetooth (JK02 protocol, 32-cell layout) ---------- */
+const SVC='0000ffe0-0000-1000-8000-00805f9b34fb',CHR='0000ffe1-0000-1000-8000-00805f9b34fb';
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let buf=[],real=false,lastRender=0,lastPt=0,badSum=0;
+function cmd(c){const p=new Uint8Array(20);p.set([0xAA,0x55,0x90,0xEB,c]);let s=0;for(let i=0;i<19;i++)s+=p[i];p[19]=s&255;return p}
+function feed(d){
+  for(const b of d)buf.push(b);
+  for(;;){
+    let i=-1;
+    for(let k=0;k+3<buf.length;k++){if(buf[k]===0x55&&buf[k+1]===0xAA&&buf[k+2]===0xEB&&buf[k+3]===0x90){i=k;break}}
+    if(i<0){buf=buf.slice(-3);return}
+    buf=buf.slice(i);
+    if(buf.length<300)return;
+    let s=0;for(let k=0;k<299;k++)s+=buf[k];
+    if((s&255)===buf[299]){const f=Uint8Array.from(buf.slice(0,300));buf=buf.slice(300);onFrame(f)}
+    else{badSum++;buf=buf.slice(4)}
+  }
+}
+function onFrame(f){
+  const dv=new DataView(f.buffer);
+  if(f[4]===1){
+    const u=o=>dv.getUint32(o,true);
+    $('scells').textContent=u(114);
+    $('sv').textContent=(u(18)/1000).toFixed(2)+' / '+(u(10)/1000).toFixed(2)+' V';
+    $('sbal').textContent=(u(138)/1000).toFixed(2)+' V, '+u(26)+' mV apart';
+    $('sma').textContent=(u(50)/1000).toFixed(0)+' / '+(u(62)/1000).toFixed(0)+' A';
+    return;
+  }
+  if(f[4]!==2)return;
+  const cells=[];
+  for(let i=0;i<32;i++){const mv=dv.getUint16(6+i*2,true);if(mv>0)cells.push(mv/1000)}
+  const total=dv.getUint32(150,true)/1000,a=dv.getInt32(158,true)/1000;
+  soc=f[173];
+  const now=Date.now();
+  if(now-lastPt>60000){lastPt=now;hist.push({t:now,soc,p:a*total});hist=hist.filter(p=>p.t>now-864e5)}
+  if(now-lastRender<1000)return;
+  lastRender=now;
+  const mx=Math.max(...cells),mn=Math.min(...cells);
+  render({cells,total,a,mx,mn,bal:f[172]>0,now:new Date(),
+    T:[dv.getInt16(144,true)/10,dv.getInt16(162,true)/10,dv.getInt16(164,true)/10],
+    rem:dv.getUint32(174,true)/1000,cy:dv.getUint32(182,true),nom:dv.getUint32(178,true)/1000,soh:f[190],mc:f[198],md:f[199]});
+}
+function setStatus(text,ok){$('upd').textContent=text;$('dot').style.background=ok?'var(--chg)':'var(--warn)'}
+$('cb').onclick=async()=>{
+  if(!navigator.bluetooth){alert('This browser cannot use Bluetooth. On iPhone, open this page in the free Bluefy app.');return}
+  const btn=$('cb');
+  try{
+    const dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:[SVC]});
+    btn.disabled=true;setStatus('Connecting…',false);
+    dev.addEventListener('gattserverdisconnected',()=>{real=false;btn.disabled=false;btn.textContent='Reconnect';setStatus('Disconnected',false)});
+    const srv=await dev.gatt.connect(),svc=await srv.getPrimaryService(SVC),ch=await svc.getCharacteristic(CHR);
+    hist=[];buf=[];real=true;cells0();
+    $('mode').textContent='live';btn.textContent='Connected';
+    ch.addEventListener('characteristicvaluechanged',e=>{const v=e.target.value;feed(new Uint8Array(v.buffer,v.byteOffset,v.byteLength))});
+    await ch.startNotifications();
+    await sleep(1000);await ch.writeValueWithoutResponse(cmd(0x97));
+    for(let i=0;i<3;i++){await sleep(2000);await ch.writeValueWithoutResponse(cmd(0x96))}
+    setStatus('Waiting for data…',true);
+  }catch(e){btn.disabled=false;setStatus(e.name==='NotFoundError'?'No device chosen':'Failed: '+e.message,false)}
+};
+function cells0(){$('cells').innerHTML=''}
+</script>
+</body>
+</html>
